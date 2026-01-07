@@ -1,12 +1,12 @@
 # Sputnik
 
-> **AI reliability layer for ERP analytics**
+> **On-policy distillation for reliable ERP analytics**
 
 [![Python](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![CI](https://img.shields.io/badge/CI-GitHub%20Actions-blue.svg)](.github/workflows/ci.yml)
 
-Sputnik is a reliability layer that enables safe, accurate AI reasoning on top of ERP data. It answers natural-language business questions over SQL-backed ERP systems and becomes more reliable over time by learning from real usage patterns.
+Sputnik is an AI reliability layer that enables safe, accurate reasoning on top of ERP data. It answers natural-language business questions over SQL-backed ERP systems and improves continuously via **on-policy distillation**—learning from real usage patterns through dense, per-token learning signals.
 
 ## The Problem
 
@@ -24,8 +24,10 @@ Sputnik provides an **AI analyst** that:
 
 1. **Answers questions naturally**: Ask business questions in plain English
 2. **Verifies itself**: Validates SQL queries before execution, ensures read-only access
-3. **Learns continuously**: Improves from real usage patterns via on-policy learning
+3. **Learns continuously**: Improves from real usage via **on-policy distillation** with per-token reverse KL divergence
 4. **Stays safe**: Enforces read-only queries, audit logging, and access controls
+
+Sputnik uses **on-policy distillation** to learn from its own rollouts: a teacher model scores each token in the student's trajectory, providing dense learning signals that enable faster, more stable improvement than sparse reward-based methods.
 
 Sputnik sits between your business users and your ERP data, providing a reliable, self-improving interface that becomes more accurate with each interaction.
 
@@ -183,9 +185,9 @@ See [docs/CONNECTORS.md](docs/CONNECTORS.md) for connector documentation.
 
 ### How does Sputnik learn and improve?
 
-Sputnik uses on-policy distillation: it learns from its own rollouts (trajectories of tokens and tool calls) by comparing them to a teacher model's expectations. This provides dense, per-token learning signals that improve reliability over time.
+Sputnik uses **on-policy distillation**: the student agent generates rollouts (trajectories of tokens and tool calls), and a teacher model scores each token with log probabilities. The training signal is **per-token reverse KL divergence** (`reverse_kl = student_logprob - teacher_logprob`), providing dense learning signals that enable faster, more stable improvement than sparse reward-based methods.
 
-See [docs/TECHNICAL.md](docs/TECHNICAL.md) for deep technical details.
+See [docs/TECHNICAL.md](docs/TECHNICAL.md) for deep technical details on the on-policy distillation algorithm.
 
 ### Is Sputnik safe for production use?
 
