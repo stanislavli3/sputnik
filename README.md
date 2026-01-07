@@ -124,11 +124,13 @@ python scripts/run_on_policy_distill.py
 
 ## Demo
 
-> **Note**: Demo GIF/image placeholder. In production, this would show:
-> - Interactive question answering
-> - SQL query generation
-> - Results visualization
-> - Learning metrics over time
+![Sputnik Interface](Interface.png)
+
+Sputnik provides an intuitive interface for querying ERP data with natural language. The interface shows:
+- Interactive question answering
+- SQL query generation and validation
+- Results visualization
+- Learning metrics over time
 
 ## Roadmap
 
