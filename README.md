@@ -67,14 +67,16 @@ Sputnik sits between your business users and your ERP data, providing a reliable
 
 ## Features
 
+- **Web Interface**: Modern React-based UI for querying and monitoring
 - **Natural Language Interface**: Ask questions in plain English
 - **SQL Generation**: Automatically generates validated SQL queries
 - **Read-Only Safety**: Enforces read-only queries by default
 - **Schema Awareness**: Understands ERP table relationships and structure
 - **Continuous Learning**: Improves from real usage via on-policy distillation
 - **Multiple Connectors**: Supports DuckDB (demo), with plans for Odoo, NetSuite, SAP
+- **REST API**: FastAPI-based backend with OpenAPI documentation
 - **Evaluation Framework**: Built-in metrics for accuracy and safety
-- **Type-Safe**: Full type annotations with mypy validation
+- **Type-Safe**: Full type annotations with mypy validation (Python) and TypeScript (frontend)
 
 ## Quickstart
 
@@ -85,10 +87,15 @@ Sputnik sits between your business users and your ERP data, providing a reliable
 git clone https://github.com/yourusername/sputnik.git
 cd sputnik
 
-# Install dependencies (using uv or poetry)
+# Install Python dependencies (using uv or poetry)
 uv pip install -e ".[dev]"
 # or
 poetry install
+
+# Install frontend dependencies
+cd frontend
+npm install
+cd ..
 ```
 
 ### Setup Demo Database
@@ -99,32 +106,44 @@ python scripts/setup_demo_db.py
 
 This creates a demo ERP database with sample tables: `customers`, `orders`, `invoices`, `inventory_movements`.
 
-### Run Interactive Demo
+### Run Full Application (Frontend + Backend)
 
+```bash
+# Start backend API server (in one terminal)
+python scripts/start_server.py
+# or
+uvicorn sputnik.api.server:app --reload
+
+# Start frontend dev server (in another terminal)
+cd frontend
+npm run dev
+```
+
+The application will be available at:
+- **Frontend**: http://localhost:8080
+- **Backend API**: http://localhost:8000
+- **API Docs**: http://localhost:8000/docs
+
+### Run Individual Components
+
+**Interactive CLI Demo:**
 ```bash
 python scripts/run_demo.py
 ```
 
-Example questions:
-- "What is the total revenue?"
-- "How many customers do we have?"
-- "What is our inventory status?"
-
-### Run Evaluation
-
+**Evaluation:**
 ```bash
 python scripts/run_eval.py
 ```
 
-### Run Distillation Training
-
+**Distillation Training:**
 ```bash
 python scripts/run_on_policy_distill.py
 ```
 
 ## Demo
 
-![Sputnik Interface](Interface.png)
+![Sputnik Interface](docs/images/Interface.png)
 
 Sputnik provides an intuitive interface for querying ERP data with natural language. The interface shows:
 - Interactive question answering
@@ -205,40 +224,34 @@ MIT License. See [LICENSE](LICENSE) for details.
 
 ## Contributing
 
-We welcome contributions! Please see our contributing guidelines:
+We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
 
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Make your changes
-4. Run tests and linting (`ruff check .`, `mypy src/`, `pytest`)
-5. Commit your changes (`git commit -m 'Add amazing feature'`)
-6. Push to the branch (`git push origin feature/amazing-feature`)
-7. Open a Pull Request
-
-### Development Setup
+Quick start:
 
 ```bash
-# Install development dependencies
-uv pip install -e ".[dev]"
+# Setup development environment
+make setup
 
-# Run linting
-ruff check .
+# Start development
+make backend  # Terminal 1
+make frontend # Terminal 2
 
-# Run type checking
-mypy src/
-
-# Run tests
-pytest
-
-# Format code
-ruff format .
+# Run quality checks
+make lint format typecheck test
 ```
+
+For more details, see:
+- [CONTRIBUTING.md](CONTRIBUTING.md) - Contribution guidelines
+- [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) - Development guide
 
 ## Documentation
 
 - [Technical Details](docs/TECHNICAL.md) - Deep dive into on-policy distillation
 - [Connectors](docs/CONNECTORS.md) - ERP connector architecture
 - [Safety](docs/SAFETY.md) - Security and safety features
+- [Authentication](docs/AUTHENTICATION.md) - Clerk authentication setup
+- [Development Guide](docs/DEVELOPMENT.md) - Development practices and workflows
+- [Contributing](CONTRIBUTING.md) - How to contribute
 
 ## License
 
