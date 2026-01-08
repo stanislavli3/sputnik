@@ -3,8 +3,15 @@
 import os
 from typing import Optional
 
-import jwt
 from fastapi import HTTPException, Request, status
+
+# Lazy import jwt - only needed when Clerk is enabled
+# This allows the server to start even if pyjwt is not installed
+# (when Clerk authentication is not being used)
+try:
+    import jwt
+except ImportError:
+    jwt = None  # Will raise error when actually needed
 
 # Clerk JWT verification
 CLERK_SECRET_KEY = os.getenv("CLERK_SECRET_KEY")
@@ -66,6 +73,13 @@ async def verify_clerk_token(request: Request) -> Optional[dict]:
             detail="Clerk not configured",
         )
 
+    # Check if jwt is available
+    if jwt is None:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="PyJWT is required for Clerk authentication. Install it with: pip install pyjwt",
+        )
+    
     try:
         # Decode and verify JWT token
         # In production, use proper JWKS verification

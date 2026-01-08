@@ -106,6 +106,37 @@ python scripts/setup_demo_db.py
 
 This creates a demo ERP database with sample tables: `customers`, `orders`, `invoices`, `inventory_movements`.
 
+### Setup LLM (Optional but Recommended)
+
+Sputnik uses open source LLMs for intelligent query planning and SQL generation. You can use:
+
+**Option 1: Ollama (Local, Recommended)**
+```bash
+# Install Ollama: https://ollama.ai
+# Pull a model
+ollama pull llama3
+
+# Set environment variables (optional, defaults shown)
+export LLM_PROVIDER=ollama
+export LLM_MODEL=llama3
+```
+
+**Option 2: OpenRouter (Cloud)**
+```bash
+# Get API key from https://openrouter.ai
+export LLM_PROVIDER=openrouter
+export LLM_MODEL=meta-llama/llama-3-8b-instruct
+export LLM_API_KEY=your_api_key_here
+```
+
+**Disable LLM (Use Rule-Based Fallback)**
+```bash
+export USE_LLM_PLANNING=false
+export USE_LLM_SQL=false
+```
+
+See [docs/LLM_SETUP.md](docs/LLM_SETUP.md) for detailed setup instructions.
+
 ### Run Full Application (Frontend + Backend)
 
 ```bash
@@ -161,7 +192,7 @@ Sputnik provides an intuitive interface for querying ERP data with natural langu
 - [x] Evaluation framework
 
 ### Phase 2: Production Readiness
-- [ ] Real LLM integration (replace mocks)
+- [x] Real LLM integration (Ollama & OpenRouter support)
 - [ ] Odoo connector
 - [ ] NetSuite connector
 - [ ] Comprehensive test suite
