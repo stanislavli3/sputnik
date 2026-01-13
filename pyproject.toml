@@ -100,10 +100,11 @@ python_classes = ["Test*"]
 python_functions = ["test_*"]
 addopts = [
     "--strict-markers",
-    "--cov=sputnik",
-    "--cov-report=term-missing",
-    "--cov-report=html",
 ]
+# Coverage options (uncomment if pytest-cov is installed)
+# "--cov=sputnik",
+# "--cov-report=term-missing",
+# "--cov-report=html",
 markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
     "integration: marks tests as integration tests",

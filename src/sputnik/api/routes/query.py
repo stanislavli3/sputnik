@@ -9,6 +9,7 @@ from pydantic import BaseModel
 from sputnik.agent.planner import Planner
 from sputnik.agent.sql_generator import SQLGenerator
 from sputnik.api.db import get_history_db
+from sputnik.api.rbac import require_permission
 from sputnik.env.duckdb_env import DuckDBEnv
 from sputnik.types import AgentResponse, SQLQuery
 
@@ -46,6 +47,7 @@ class QueryResponse(BaseModel):
 
 
 @router.post("/query", response_model=QueryResponse)
+@require_permission("query:execute")
 async def execute_query(
     request: QueryRequest,
     http_request: Request,

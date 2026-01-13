@@ -193,14 +193,17 @@ Sputnik provides an intuitive interface for querying ERP data with natural langu
 
 ### Phase 2: Production Readiness
 - [x] Real LLM integration (Ollama & OpenRouter support)
+- [x] Performance optimization
 - [ ] Odoo connector
 - [ ] NetSuite connector
 - [ ] Comprehensive test suite
-- [ ] Performance optimization
 
 ### Phase 3: Enterprise Features
-- [ ] Audit logging
-- [ ] Access control (allowlist/denylist)
+- [x] Audit logging
+- [x] Access control (RBAC with roles and permissions)
+- [x] Session management
+- [x] Role management UI
+- [x] Audit log viewer with export
 - [ ] PII detection and handling
 - [ ] Multi-tenant support
 - [ ] Dashboard and monitoring

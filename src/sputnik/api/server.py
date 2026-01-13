@@ -1,12 +1,16 @@
 """FastAPI server for Sputnik."""
 
 import os
+from datetime import datetime
 import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from sputnik.api.middleware import clerk_auth_middleware
-from sputnik.api.routes import query, queries, reviews, risk, metrics, templates, export, rollouts, schema, models
+from sputnik.api.routes import (
+    query, queries, reviews, risk, metrics, templates, export, rollouts, schema, models,
+    users, sessions, audit,
+)
 
 app = FastAPI(
     title="Sputnik API",
@@ -48,6 +52,9 @@ app.include_router(export.router, prefix="/api/v1", tags=["export"])
 app.include_router(rollouts.router, prefix="/api/v1", tags=["rollouts"])
 app.include_router(schema.router, prefix="/api/v1", tags=["schema"])
 app.include_router(models.router, prefix="/api/v1", tags=["models"])
+app.include_router(users.router, prefix="/api/v1", tags=["users"])
+app.include_router(sessions.router, prefix="/api/v1", tags=["sessions"])
+app.include_router(audit.router, prefix="/api/v1", tags=["audit"])
 
 
 @app.get("/")
@@ -98,8 +105,15 @@ async def health() -> dict:
 async def startup_event():
     """Initialize services on startup."""
     # Start job queue
+    from sputnik.api.jobs import get_job_queue
     get_job_queue()
     print("✅ Job queue started")
+    
+    # Cleanup expired sessions
+    from sputnik.api.sessions import cleanup_expired_sessions
+    cleaned = cleanup_expired_sessions()
+    if cleaned > 0:
+        print(f"✅ Cleaned up {cleaned} expired session(s)")
 
 
 @app.on_event("shutdown")

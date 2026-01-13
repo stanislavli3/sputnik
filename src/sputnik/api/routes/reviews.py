@@ -6,6 +6,7 @@ from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
 from sputnik.api.db import get_reviews_db, get_history_db
+from sputnik.api.rbac import require_permission
 
 router = APIRouter()
 
@@ -119,6 +120,7 @@ async def get_review(
 
 
 @router.post("/reviews/{review_id}/approve")
+@require_permission("reviews:approve")
 async def approve_review(
     review_id: str,
     request: ReviewActionRequest,
@@ -161,6 +163,7 @@ async def approve_review(
 
 
 @router.post("/reviews/{review_id}/reject")
+@require_permission("reviews:reject")
 async def reject_review(
     review_id: str,
     request: ReviewActionRequest,
@@ -204,6 +207,7 @@ async def reject_review(
 
 
 @router.post("/reviews/{review_id}/edit")
+@require_permission("reviews:edit")
 async def edit_and_approve_review(
     review_id: str,
     request: ReviewActionRequest,
