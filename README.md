@@ -1,300 +1,155 @@
 # Sputnik
 
-> **On-policy distillation for reliable ERP analytics**
+Sputnik answers plain-English business questions over an ERP database by planning the question, generating read-only SQL, running it and summarizing the result, and records each run so a model can later be trained on its own usage.
 
-[![Python](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
-[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-[![CI](https://img.shields.io/badge/CI-GitHub%20Actions-blue.svg)](.github/workflows/ci.yml)
+## Why
 
-Sputnik is an AI reliability layer that enables safe, accurate reasoning on top of ERP data. It answers natural-language business questions over SQL-backed ERP systems and improves continuously via **on-policy distillation**—learning from real usage patterns through dense, per-token learning signals.
+Revenue, orders, invoices and inventory all live in the ERP, but getting a simple number out of it usually means asking an analyst who knows the schema and writes SQL. Letting a language model write that SQL is tempting, and also risky: it can invent tables, return a confident wrong answer, or run a statement that changes data. Sputnik is an early attempt at a careful layer in between: keep queries read-only, attach a risk score and a review queue to every answer, log who asked what, and collect rollouts so the model can be improved with on-policy distillation instead of sparse right-or-wrong rewards.
 
-## The Problem
+## What it does
 
-Enterprise Resource Planning (ERP) systems contain critical business data—revenue, inventory, customer relationships, financial transactions. Yet this data is often locked behind complex interfaces that require specialized knowledge to query effectively. Business teams rely on data analysts and SQL experts to answer even simple questions, creating bottlenecks and delays.
+- Takes a question in plain English, plans the steps, and generates SQL against the database schema with an LLM (Ollama or OpenRouter), falling back to rule-based SQL when no model is available.
+- Checks generated SQL for write statements (`INSERT`, `UPDATE`, `DELETE`, `DROP`, `CREATE`, `ALTER`, `TRUNCATE`) before running it on DuckDB.
+- Summarizes the result rows into an answer and stores the question, SQL, answer and timing in a query history.
+- Scores each answer for risk from its confidence, and lets reviewers approve, edit, reject or escalate answers.
+- Provides role-based access control, session management and an audit log through a FastAPI REST API.
+- Collects agent rollouts and computes a per-token reverse KL training signal against a teacher model (the distillation step itself is still a skeleton, see Status).
 
-Traditional AI solutions for ERP analytics face reliability challenges:
-- **Hallucination**: Models generate plausible-sounding but incorrect SQL queries
-- **Safety**: Risk of executing destructive operations on production data
-- **Context**: Difficulty understanding complex ERP schemas and relationships
-- **Adaptation**: Models don't improve from real-world usage patterns
+## How it works
 
-## The Solution
-
-Sputnik provides an **AI analyst** that:
-
-1. **Answers questions naturally**: Ask business questions in plain English
-2. **Verifies itself**: Validates SQL queries before execution, ensures read-only access
-3. **Learns continuously**: Improves from real usage via **on-policy distillation** with per-token reverse KL divergence
-4. **Stays safe**: Enforces read-only queries, audit logging, and access controls
-
-Sputnik uses **on-policy distillation** to learn from its own rollouts: a teacher model scores each token in the student's trajectory, providing dense learning signals that enable faster, more stable improvement than sparse reward-based methods.
-
-Sputnik sits between your business users and your ERP data, providing a reliable, self-improving interface that becomes more accurate with each interaction.
-
-## Architecture
-
-```
-┌─────────────┐
-│   Business  │
-│   Question  │
-└──────┬──────┘
-       │
-       ▼
-┌─────────────────┐
-│  Agent Planner  │  ← Breaks down question into steps
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│  SQL Generator  │  ← Converts to validated SQL
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│   Verifier      │  ← Ensures read-only, safe queries
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│  ERP Connector  │  ← Executes queries (DuckDB, Odoo, etc.)
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│  Learning Loop  │  ← Improves from usage patterns
-└─────────────────┘
+```mermaid
+flowchart LR
+    Q[Business question] --> P[Planner<br/>LLM or rules]
+    P --> G[SQL generator<br/>LLM or rule-based fallback]
+    G --> V{Read-only check}
+    V --> E[(DuckDB<br/>demo ERP)]
+    E --> A[Answer summary<br/>LLM]
+    A --> H[Query history<br/>audit log]
+    A --> R[Risk score<br/>review queue]
+    H --> C[Rollout collector]
+    C --> T[Teacher scores tokens]
+    T --> K[Per-token reverse KL<br/>training signal]
 ```
 
-## Features
+On-policy distillation: the student agent produces a trajectory of tokens and tool calls, a teacher model assigns a log probability to each token, and the training signal is `reverse_kl = student_logprob - teacher_logprob` per token. A dense per-token signal is expected to learn faster and more stably than a single reward at the end of the answer. See [docs/TECHNICAL.md](docs/TECHNICAL.md).
 
-- **Web Interface**: Modern React-based UI for querying and monitoring
-- **Natural Language Interface**: Ask questions in plain English
-- **SQL Generation**: Automatically generates validated SQL queries
-- **Read-Only Safety**: Enforces read-only queries by default
-- **Schema Awareness**: Understands ERP table relationships and structure
-- **Continuous Learning**: Improves from real usage via on-policy distillation
-- **Multiple Connectors**: Supports DuckDB (demo), with plans for Odoo, NetSuite, SAP
-- **REST API**: FastAPI-based backend with OpenAPI documentation
-- **Evaluation Framework**: Built-in metrics for accuracy and safety
-- **Type-Safe**: Full type annotations with mypy validation (Python) and TypeScript (frontend)
+## Status
 
-## Quickstart
+Alpha, built solo, and not ready for production data. Things to know before trying it:
 
-### Installation
+- The web UI is kept in a separate repository; `frontend/` here is only a pointer to it, so a fresh clone has no UI.
+- The DuckDB environment module (`src/sputnik/env/`) is currently excluded by an `env/` rule in `.gitignore`, so the API server and `run_demo.py` will not start from a fresh clone until it is added.
+- The read-only check is a keyword check on the generated SQL; the step meant to rewrite an unsafe query (`_make_read_only`) is a stub.
+- The distillation trainer uses a mock teacher and computes the training signal and metrics, but does not update model weights yet. `scripts/run_eval.py` also runs on two mock examples.
+
+## Quick start
+
+Python 3.11+.
 
 ```bash
-# Clone the repository
-git clone https://github.com/yourusername/sputnik.git
+git clone https://github.com/stanislavli3/sputnik.git
 cd sputnik
-
-# Install Python dependencies (using uv or poetry)
-uv pip install -e ".[dev]"
-# or
-poetry install
-
-# Install frontend dependencies
-cd frontend
-npm install
-cd ..
+pip install -e ".[dev]"
+python scripts/setup_demo_db.py      # demo ERP: customers, orders, invoices, inventory_movements
 ```
 
-### Setup Demo Database
+### LLM (optional)
 
+**Ollama (local)**
 ```bash
-python scripts/setup_demo_db.py
-```
-
-This creates a demo ERP database with sample tables: `customers`, `orders`, `invoices`, `inventory_movements`.
-
-### Setup LLM (Optional but Recommended)
-
-Sputnik uses open source LLMs for intelligent query planning and SQL generation. You can use:
-
-**Option 1: Ollama (Local, Recommended)**
-```bash
-# Install Ollama: https://ollama.ai
-# Pull a model
 ollama pull llama3
-
-# Set environment variables (optional, defaults shown)
 export LLM_PROVIDER=ollama
 export LLM_MODEL=llama3
 ```
 
-**Option 2: OpenRouter (Cloud)**
+**OpenRouter (cloud)**
 ```bash
-# Get API key from https://openrouter.ai
 export LLM_PROVIDER=openrouter
 export LLM_MODEL=meta-llama/llama-3-8b-instruct
 export LLM_API_KEY=your_api_key_here
 ```
 
-**Disable LLM (Use Rule-Based Fallback)**
+**No LLM (rule-based fallback)**
 ```bash
 export USE_LLM_PLANNING=false
 export USE_LLM_SQL=false
 ```
 
-See [docs/LLM_SETUP.md](docs/LLM_SETUP.md) for detailed setup instructions.
+See [docs/LLM_SETUP.md](docs/LLM_SETUP.md) for details.
 
-### Run Full Application (Frontend + Backend)
+### Run
 
 ```bash
-# Start backend API server (in one terminal)
-python scripts/start_server.py
+python scripts/start_server.py            # API on http://localhost:8000, docs at /docs
 # or
 uvicorn sputnik.api.server:app --reload
-
-# Start frontend dev server (in another terminal)
-cd frontend
-npm run dev
 ```
 
-The application will be available at:
-- **Frontend**: http://localhost:8080
-- **Backend API**: http://localhost:8000
-- **API Docs**: http://localhost:8000/docs
+Individual components:
 
-### Run Individual Components
-
-**Interactive CLI Demo:**
 ```bash
-python scripts/run_demo.py
+python scripts/run_demo.py                # interactive CLI demo
+python scripts/run_eval.py                # evaluation (mock examples for now)
+python scripts/run_on_policy_distill.py   # distillation loop on mock rollouts
 ```
 
-**Evaluation:**
-```bash
-python scripts/run_eval.py
+Development commands are in the `Makefile` (`make help`); tests run with `pytest tests/`.
+
+## API
+
+All routes are under `/api/v1`. Main groups:
+
+| Group | Examples |
+|---|---|
+| Query | `POST /query`, `GET /queries/history`, `GET /queries/{id}/export` |
+| Review and risk | `GET /reviews`, `POST /reviews/{id}/approve`, `GET /query/{id}/risk`, `POST /query/{id}/escalate` |
+| Learning | `GET /rollouts`, `POST /rollouts/train`, `GET /metrics/overview` |
+| Schema and models | `GET /schema`, `GET /models`, `POST /models/select` |
+| Access | `GET /users/me/roles`, `POST /users/roles/assign`, `GET /sessions/me`, `GET /audit/logs` |
+
+Authentication uses Clerk JWTs; see [docs/AUTHENTICATION.md](docs/AUTHENTICATION.md).
+
+## Project layout
+
 ```
-
-**Distillation Training:**
-```bash
-python scripts/run_on_policy_distill.py
+sputnik/
+├── src/sputnik/
+│   ├── agent/        # planner, SQL generator, tool router
+│   ├── api/          # FastAPI server, routes, RBAC, audit, sessions, risk, history DB
+│   ├── distill/      # rollout collector, teacher, reverse KL, trainer
+│   ├── eval/         # evaluation runner and metrics
+│   ├── llm/          # Ollama and OpenRouter clients
+│   └── types.py
+├── scripts/          # demo DB setup, server, demo, eval, distillation
+├── tests/
+└── docs/             # technical, connectors, safety, auth, development, LLM setup
 ```
-
-## Demo
-
-![Sputnik Interface](docs/images/Interface.png)
-
-Sputnik provides an intuitive interface for querying ERP data with natural language. The interface shows:
-- Interactive question answering
-- SQL query generation and validation
-- Results visualization
-- Learning metrics over time
 
 ## Roadmap
 
-### Phase 1: Foundation (Current)
 - [x] Core architecture and types
-- [x] DuckDB connector
-- [x] Basic SQL generation
-- [x] On-policy distillation skeleton
-- [x] Evaluation framework
-
-### Phase 2: Production Readiness
-- [x] Real LLM integration (Ollama & OpenRouter support)
-- [x] Performance optimization
-- [ ] Odoo connector
-- [ ] NetSuite connector
-- [ ] Comprehensive test suite
-
-### Phase 3: Enterprise Features
-- [x] Audit logging
-- [x] Access control (RBAC with roles and permissions)
-- [x] Session management
-- [x] Role management UI
-- [x] Audit log viewer with export
-- [ ] PII detection and handling
+- [x] DuckDB connector for demos
+- [x] LLM integration (Ollama and OpenRouter)
+- [x] Audit logging, RBAC, session management
+- [x] On-policy distillation skeleton and evaluation framework
+- [ ] Weight updates with a real teacher and student
+- [ ] Odoo and NetSuite connectors
+- [ ] PII detection and masking
 - [ ] Multi-tenant support
-- [ ] Dashboard and monitoring
 
-### Phase 4: Advanced Learning
-- [ ] Fine-tuning pipeline
-- [ ] Active learning
-- [ ] Human feedback integration
-- [ ] Model versioning and rollback
+## Results
 
-## Security & Safety
-
-Sputnik is designed with safety as a first-class concern:
-
-- **Read-Only by Default**: All queries are validated to be read-only
-- **Query Validation**: SQL queries are checked before execution
-- **Audit Logging**: All queries and responses are logged (roadmap)
-- **Access Control**: Table and column-level access control (roadmap)
-- **PII Handling**: Detection and masking of personally identifiable information (roadmap)
-
-See [docs/SAFETY.md](docs/SAFETY.md) for detailed safety documentation.
-
-## FAQ
-
-### What ERP systems does Sputnik support?
-
-Currently, Sputnik includes a DuckDB connector for demos and testing. We're planning connectors for:
-- Odoo
-- NetSuite
-- SAP
-- Custom SQL databases
-
-See [docs/CONNECTORS.md](docs/CONNECTORS.md) for connector documentation.
-
-### How does Sputnik learn and improve?
-
-Sputnik uses **on-policy distillation**: the student agent generates rollouts (trajectories of tokens and tool calls), and a teacher model scores each token with log probabilities. The training signal is **per-token reverse KL divergence** (`reverse_kl = student_logprob - teacher_logprob`), providing dense learning signals that enable faster, more stable improvement than sparse reward-based methods.
-
-See [docs/TECHNICAL.md](docs/TECHNICAL.md) for deep technical details on the on-policy distillation algorithm.
-
-### Is Sputnik safe for production use?
-
-Sputnik is currently in **alpha** status. While it includes safety features (read-only queries, validation), it should be tested thoroughly in non-production environments before production deployment.
-
-### Can I contribute?
-
-Yes! See [Contributing](#contributing) below.
-
-### What's the license?
-
-MIT License. See [LICENSE](LICENSE) for details.
-
-## Contributing
-
-We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
-
-Quick start:
-
-```bash
-# Setup development environment
-make setup
-
-# Start development
-make backend  # Terminal 1
-make frontend # Terminal 2
-
-# Run quality checks
-make lint format typecheck test
-```
-
-For more details, see:
-- [CONTRIBUTING.md](CONTRIBUTING.md) - Contribution guidelines
-- [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) - Development guide
+No accuracy results yet. The evaluation and distillation scripts currently run on mock components, so there are no numbers worth reporting.
 
 ## Documentation
 
-- [Technical Details](docs/TECHNICAL.md) - Deep dive into on-policy distillation
-- [Connectors](docs/CONNECTORS.md) - ERP connector architecture
-- [Safety](docs/SAFETY.md) - Security and safety features
-- [Authentication](docs/AUTHENTICATION.md) - Clerk authentication setup
-- [Development Guide](docs/DEVELOPMENT.md) - Development practices and workflows
-- [Contributing](CONTRIBUTING.md) - How to contribute
+- [Technical details](docs/TECHNICAL.md): on-policy distillation
+- [Connectors](docs/CONNECTORS.md): ERP connector design
+- [Safety](docs/SAFETY.md): safety features
+- [Authentication](docs/AUTHENTICATION.md): Clerk setup
+- [Development](docs/DEVELOPMENT.md): development workflow
+- [Contributing](CONTRIBUTING.md)
 
 ## License
 
-MIT License. See [LICENSE](LICENSE) for details.
-
-## Acknowledgments
-
-Built with attention to reliability, safety, and continuous improvement. Designed for enterprise use cases where accuracy and trust are paramount.
-
----
-
-**Sputnik**: Reliable AI reasoning on top of ERP systems.
+MIT. See [LICENSE](LICENSE).
