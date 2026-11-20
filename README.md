@@ -18,17 +18,19 @@ Revenue, orders, invoices and inventory all live in the ERP, but getting a simpl
 ## How it works
 
 ```mermaid
-flowchart LR
+flowchart TD
     Q[Business question] --> P[Planner<br/>LLM or rules]
     P --> G[SQL generator<br/>LLM or rule-based fallback]
     G --> V{Read-only check}
-    V --> E[(DuckDB<br/>demo ERP)]
+    V --> E[(DuckDB demo ERP)]
     E --> A[Answer summary<br/>LLM]
-    A --> H[Query history<br/>audit log]
-    A --> R[Risk score<br/>review queue]
-    H --> C[Rollout collector]
-    C --> T[Teacher scores tokens]
-    T --> K[Per-token reverse KL<br/>training signal]
+    A --> R[Risk score and review queue]
+    A --> H[Query history and audit log]
+    subgraph D[On-policy distillation]
+        C[Rollout collector] --> T[Teacher scores each token]
+        T --> K[Per-token reverse KL<br/>training signal]
+    end
+    H --> C
 ```
 
 On-policy distillation: the student agent produces a trajectory of tokens and tool calls, a teacher model assigns a log probability to each token, and the training signal is `reverse_kl = student_logprob - teacher_logprob` per token. A dense per-token signal is expected to learn faster and more stably than a single reward at the end of the answer. See [docs/TECHNICAL.md](docs/TECHNICAL.md).
